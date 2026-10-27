@@ -1,0 +1,15 @@
+{
+  "name": "Oxelara AI",
+  "short_name": "Oxelara",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#101210",
+  "theme_color": "#101210",
+  "description": "A calmer place to think with Oxelara AI.",
+  "icons": [{
+    "src": "./icon.svg",
+    "sizes": "any",
+    "type": "image/svg+xml",
+    "purpose": "any maskable"
+  }]
+}

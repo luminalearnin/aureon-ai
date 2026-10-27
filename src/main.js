@@ -1,6 +1,8 @@
-const STORAGE_KEY = 'oxelara.workspace.v1';
+const STORAGE_KEY = 'oxelara.workspace.v2';
+const PROFILE_KEY = 'oxelara.profile.v1';
+const CONSENT_KEY = 'oxelara.consent.v1';
 const ICONS = {
-  spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.4 5.6L5 10l5.6 1.4L12 17l1.4-5.6L19 10l-5.6-1.4L12 3Z"/><path d="m19 16-.7 2.3L16 19l2.3.7L19 22l.7-2.3L22 19l-2.3-.7L19 16Z"/></svg>',
+  spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.4 5.6L5 10l5.6 1.4L12 17l1.4-5.6L19 10l-5.6-1.4L12 3Z"/><path d="m19 16-.7 2.3L16 19l2.3.7L19 22l.7-2.3L19 16Z"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   message: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.5 8.5 0 0 1-3.5-.75L4 20l1.45-3.55A7.48 7.48 0 0 1 4.5 12c0-4.14 3.36-7.5 7.5-7.5S20 7.36 20 11.5Z"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg>',
@@ -13,222 +15,49 @@ const ICONS = {
   attach: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m20.5 11.5-8.8 8.8a5 5 0 0 1-7-7l9-9a3.4 3.4 0 0 1 4.8 4.8l-9 9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2"/></svg>',
   arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
   stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg>',
+  image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 17 5-5 3.5 3 2.5-2 5 4"/></svg>',
 };
-
 const starters = [
   { icon: ICONS.spark, title: 'Shape a launch strategy', hint: 'From idea to first signal' },
   { icon: ICONS.message, title: 'Turn notes into a plan', hint: 'Make the path obvious' },
   { icon: ICONS.search, title: 'Explain a complex idea', hint: 'Clear enough to share' },
   { icon: ICONS.edit, title: 'Review a code snippet', hint: 'Find the sharp edges' },
 ];
-
-const state = {
-  threads: loadThreads(),
-  activeId: null,
-  generating: false,
-  streamTimer: null,
-  editingMessageId: null,
-  mobileOpen: false,
-};
-
+const state = { threads: loadThreads(), activeId: null, generating: false, streamTimer: null, editingMessageId: null, mobileOpen: false, modal: null, imageMode: false };
 if (!state.threads.length) state.threads = [makeThread('Untitled conversation')];
 state.activeId = state.threads[0].id;
-
 function uid() { return `th_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`; }
 function makeThread(title = 'Untitled conversation') { return { id: uid(), title, messages: [], createdAt: Date.now(), updatedAt: Date.now() }; }
-function loadThreads() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return Array.isArray(parsed) ? parsed.filter((thread) => thread && typeof thread.id === 'string' && Array.isArray(thread.messages)) : [];
-  } catch { return []; }
-}
+function loadThreads() { try { const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); return Array.isArray(parsed) ? parsed.filter((t) => t && typeof t.id === 'string' && Array.isArray(t.messages)) : []; } catch { return []; } }
 function saveThreads() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.threads)); } catch { showToast('Your browser could not save this thread.'); } }
-function activeThread() { return state.threads.find((thread) => thread.id === state.activeId) || state.threads[0]; }
-function timeLabel(timestamp) { const d = new Date(timestamp); return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
-function esc(value = '') { return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char])); }
-
-function renderMarkdown(raw = '') {
-  const blocks = raw.split(/```/g);
-  return blocks.map((block, index) => {
-    if (index % 2 === 1) {
-      const lines = block.replace(/^\n/, '').split('\n');
-      const language = lines.shift() || 'code';
-      const code = lines.join('\n');
-      return `<div class="code-block"><div class="code-head"><span>${esc(language)}</span><button class="code-copy" data-copy="${encodeURIComponent(code)}">Copy</button></div><pre>${esc(code)}</pre></div>`;
-    }
-    let html = esc(block);
-    html = html.replace(/^### (.*)$/gm, '<h3>$1</h3>');
-    html = html.replace(/^## (.*)$/gm, '<h3>$1</h3>');
-    html = html.replace(/^# (.*)$/gm, '<h3>$1</h3>');
-    html = html.replace(/^[-*] (.*)$/gm, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
-    html = html.replace(/^(\d+)\. (.*)$/gm, '<div class="ordered-item"><span>$1.</span> $2</div>');
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
-    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    html = html.replace(/`([^`]+)`/g, '<span class="inline-code">$1</span>');
-    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
-    return html.split(/\n{2,}/).map((paragraph) => paragraph.startsWith('<h3>') || paragraph.startsWith('<ul>') ? paragraph : `<p>${paragraph.replace(/\n/g, '<br>')}</p>`).join('');
-  }).join('');
-}
-
-function classify(prompt) {
-  const text = prompt.toLowerCase();
-  if (/launch|marketing|campaign|go-to-market|gtm/.test(text)) return 'launch';
-  if (/plan|roadmap|organize|notes|project|workflow|strategy/.test(text)) return 'plan';
-  if (/explain|what is|how does|teach|complex|difference|why/.test(text)) return 'explain';
-  if (/code|debug|bug|review|javascript|typescript|python|react|function|api/.test(text)) return 'code';
-  if (/write|draft|email|copy|headline|post|creative/.test(text)) return 'write';
-  return 'general';
-}
-
-function composeResponse(prompt, thread) {
-  const intent = classify(prompt);
-  const name = prompt.trim().split(/\s+/).slice(0, 7).join(' ');
-  const context = thread.messages.length > 1 ? '\n\nI’m also carrying the thread context forward, so we can sharpen this from here.' : '';
-  const responses = {
-    launch: `## A sharper launch frame\n\nFor **${name}**, I’d optimize for a narrow first signal rather than broad awareness. The goal is to make one audience feel that the product was made specifically for their next decision.${context}\n\n### 1. Choose the wedge\n- Name the highest-intent audience in one sentence.\n- Anchor the promise to a visible before → after.\n- Give the first experience a single success moment.\n\n### 2. Build the signal loop\n1. Publish one point-of-view artifact that makes the problem feel urgent.\n2. Invite 10–15 ideal users into a guided first run.\n3. Capture the exact language they use when the value clicks.\n4. Reuse that language everywhere else.\n\n**Useful constraint:** if the launch needs more than one primary CTA, the story is still too wide.`,
-    plan: `## Turn the idea into motion\n\nHere’s a clean operating shape for **${name}**. It keeps momentum visible without pretending every unknown is already solved.${context}\n\n### Now — create traction\n- Define the outcome in one observable sentence.\n- List the three decisions that unlock the next step.\n- Assign an owner and a finish line to each decision.\n\n### Next — reduce uncertainty\n- Identify the assumption most likely to invalidate the plan.\n- Run the smallest test that can change your mind.\n- Record the signal, not just the activity.\n\n### Later — scale the repeatable\nPackage what works into a ritual, template, or system. A good plan should become lighter every time you use it.`,
-    explain: `## The clear version\n\nThink of **${name}** as a system with three layers:\n\n1. **Input** — what the system can observe or receive.\n2. **Transformation** — the rules, reasoning, or process that changes the input.\n3. **Output** — the decision, artifact, or action that becomes useful.\n\nThe common confusion is treating the transformation as magic. In practice, quality comes from the relationship between the three layers: better inputs narrow ambiguity, a visible process makes the result trustworthy, and a specific output makes the result actionable.\n\nIf you share the exact context, I can turn this into an example, an analogy, or a technical breakdown.`,
-    code: `## Code review lens\n\nI’d review **${name}** in this order:\n\n- **Correctness:** what happens on empty, delayed, duplicated, or malformed input?\n- **Boundaries:** which responsibility belongs elsewhere?\n- **Observability:** how would you know this failed in production?\n- **Clarity:** can the next engineer predict the behavior without simulating every branch?\n\nA small pattern I use for safer async work:\n\n\`\`\`js\nconst result = await runTask(input);\nif (!result.ok) {\n  return { ok: false, reason: result.reason };\n}\nreturn { ok: true, value: result.value };\n\`\`\`\n\nPaste the snippet and I’ll mark up the sharp edges directly.`,
-    write: `## A strong first draft\n\nI can shape **${name}** into something direct, specific, and easy to act on. I’d start with a clear point of view instead of a neutral summary:\n\n> Make the important idea impossible to miss — then give the reader a next move.\n\nFrom there, I’ll tune the voice for the audience, remove filler, and keep one dominant message per paragraph. Send me the rough notes, audience, and desired tone, and I’ll turn them into a finished draft.`,
-    general: `## Let’s make it useful\n\nI’m Oxelara’s built-in reasoning engine. I can help you move from a loose prompt to a clearer decision, plan, explanation, draft, or implementation direction.\n\nFor the strongest result, give me:\n- the outcome you want,\n- the context I should respect, and\n- any constraint that matters.\n\nYou don’t need to configure a model or bring an API key here — just bring the thought.`,
-  };
-  return responses[intent];
-}
-
-function iconButton(label, icon, className = '', attrs = '') { return `<button class="icon-ghost ${className}" aria-label="${label}" title="${label}" ${attrs}>${icon}</button>`; }
-
-function render() {
-  const thread = activeThread();
-  const hasMessages = thread?.messages?.length > 0;
-  document.querySelector('#app').innerHTML = `
-    <div class="app-shell">
-      <aside class="sidebar ${state.mobileOpen ? 'open' : ''}" aria-label="Conversation navigation">
-        <div class="brand">
-          <div class="brand-mark">${ICONS.spark}</div>
-          <div><div class="brand-name">OXELARA</div><div class="brand-tag">Intelligence, refined.</div></div>
-        </div>
-        <button class="new-thread" data-action="new-thread">${ICONS.plus}<span>New conversation</span></button>
-        <div class="side-section">
-          <div class="side-label"><span>Your threads</span><button class="search-btn" data-action="search" aria-label="Search conversations">${ICONS.search}</button></div>
-          <div class="thread-list">
-            ${state.threads.slice().sort((a,b) => b.updatedAt - a.updatedAt).map(threadRow).join('') || '<div class="empty-threads">Your next line of thinking will live here.</div>'}
-          </div>
-        </div>
-        <div class="sidebar-footer"><div class="engine-badge"><i class="engine-dot"></i><span>Oxelara Neural Engine</span></div><div class="engine-meta">LOCAL SESSION · READY</div></div>
-      </aside>
-      <main class="workspace">
-        <header class="topbar">
-          <div class="mobile-brand"><div class="brand-mark">${ICONS.spark}</div><div class="brand-name">OXELARA</div></div>
-          <div class="thread-context"><div class="eyebrow">Active thread</div><h2>${esc(thread?.title || 'Untitled conversation')}</h2></div>
-          <div class="top-actions">
-            <button class="top-action mobile-menu" data-action="toggle-menu" aria-label="Open conversations">${ICONS.menu}</button>
-            <div class="status-pill"><i class="engine-dot"></i> OXELARA ENGINE · READY</div>
-            <button class="top-action" data-action="new-thread">${ICONS.plus}<span>New thread</span></button>
-            <button class="top-action" data-action="thread-menu" aria-label="Thread options">${ICONS.more}</button>
-          </div>
-        </header>
-        <section class="content">
-          <div class="chat-column">
-            <div class="messages" id="messages">
-              ${hasMessages ? `<div class="message-list">${thread.messages.map(messageMarkup).join('')}</div>` : emptyMarkup()}
-            </div>
-            <div class="composer-wrap">
-              <form class="composer" id="composer">
-                <button type="button" class="attach-btn" data-action="attach" aria-label="Attach a file" title="Attachments are coming soon">${ICONS.attach}</button>
-                <textarea id="prompt" rows="1" placeholder="Ask Oxelara anything…" aria-label="Message Oxelara"></textarea>
-                <div class="composer-actions">${state.generating ? `<button type="button" class="stop-btn" data-action="stop" aria-label="Stop generation">${ICONS.stop}</button>` : `<button class="send-btn" type="submit" aria-label="Send message">${ICONS.arrow}</button>`}</div>
-              </form>
-              <div class="composer-hint"><span>Oxelara Engine · Local session · No API key required</span><span class="hint-right"><span>Press</span><span class="key-hint">⌘ ↵</span><span>to send</span></span></div>
-            </div>
-          </div>
-        </section>
-      </main>
-      <div class="toast" id="toast"></div>
-    </div>`;
-  bindEvents();
-  if (hasMessages) scrollMessages();
-}
-
-function threadRow(thread) {
-  return `<div class="thread-item ${thread.id === state.activeId ? 'active' : ''}" data-thread="${thread.id}"><span class="thread-icon">${ICONS.message}</span><span class="thread-title">${esc(thread.title)}</span><span class="thread-actions">${iconButton('Rename', ICONS.edit, '', `data-rename="${thread.id}"`)}${iconButton('Delete', ICONS.trash, 'danger', `data-delete="${thread.id}"`)}</span></div>`;
-}
-
-function emptyMarkup() {
-  return `<div class="empty-state"><div class="empty-kicker">Private intelligence suite</div><h1>Think <em>beyond</em><br />the prompt.</h1><p>Oxelara turns scattered thoughts into clear direction — with an opinion when you need one and room to think when you don’t.</p><div class="prompt-grid">${starters.map((item, index) => `<button class="prompt-card" data-starter="${index}"><span class="prompt-icon">${item.icon}</span><strong>${item.title}</strong><span>${item.hint}</span></button>`).join('')}</div></div>`;
-}
-
-function messageMarkup(message, index) {
-  const isUser = message.role === 'user';
-  const content = message.streaming && !message.content ? '<span class="typing"><i></i><i></i><i></i></span>' : (isUser ? esc(message.content).replace(/\n/g, '<br>') : renderMarkdown(message.content));
-  return `<article class="message ${isUser ? 'user' : 'assistant'} ${message.streaming ? 'is-streaming' : ''}" data-message="${message.id}"><div class="avatar">${isUser ? 'Y' : ICONS.spark}</div><div class="message-body"><div class="message-meta"><span>${isUser ? 'You' : 'Oxelara'}</span><span>${message.streaming ? 'thinking…' : timeLabel(message.createdAt)}</span></div><div class="message-content">${content}</div><div class="message-tools">${!isUser && !message.streaming ? `<button class="tool-btn" data-copy-message="${message.id}">${ICONS.copy} Copy</button><button class="tool-btn" data-regenerate="${message.id}">${ICONS.refresh} Regenerate</button>` : ''}${isUser ? `<button class="tool-btn" data-edit-message="${message.id}">${ICONS.edit} Edit</button>` : ''}</div></div></article>`;
-}
-
-function bindEvents() {
-  document.querySelectorAll('[data-action="new-thread"]').forEach((button) => button.addEventListener('click', newThread));
-  document.querySelector('[data-action="toggle-menu"]')?.addEventListener('click', () => { state.mobileOpen = !state.mobileOpen; render(); });
-  document.querySelector('[data-action="search"]')?.addEventListener('click', searchThreads);
-  document.querySelector('[data-action="thread-menu"]')?.addEventListener('click', () => renameThread(state.activeId));
-  document.querySelectorAll('[data-thread]').forEach((row) => row.addEventListener('click', (event) => {
-    if (event.target.closest('[data-rename]') || event.target.closest('[data-delete]')) return;
-    if (state.generating) { showToast('Let the current response finish first.'); return; }
-    state.activeId = row.dataset.thread; state.mobileOpen = false; render();
-  }));
-  document.querySelectorAll('[data-rename]').forEach((button) => button.addEventListener('click', (event) => { event.stopPropagation(); renameThread(button.dataset.rename); }));
-  document.querySelectorAll('[data-delete]').forEach((button) => button.addEventListener('click', (event) => { event.stopPropagation(); deleteThread(button.dataset.delete); }));
-  document.querySelectorAll('[data-starter]').forEach((button) => button.addEventListener('click', () => {
-    if (activeThread().messages.length) newThread();
-    sendPrompt(starters[button.dataset.starter].title);
-  }));
-  document.querySelector('#composer')?.addEventListener('submit', (event) => { event.preventDefault(); sendPrompt(document.querySelector('#prompt').value); });
-  document.querySelector('#prompt')?.addEventListener('keydown', (event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); sendPrompt(event.target.value); } resizeTextarea(event.target); });
-  document.querySelector('#prompt')?.addEventListener('input', (event) => resizeTextarea(event.target));
-  document.querySelector('[data-action="stop"]')?.addEventListener('click', stopGeneration);
-  document.querySelector('[data-action="attach"]')?.addEventListener('click', () => showToast('Attachments will be available in a future Oxelara release.'));
-  document.querySelectorAll('[data-copy-message]').forEach((button) => button.addEventListener('click', () => copyMessage(button.dataset.copyMessage)));
-  document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', () => copyText(decodeURIComponent(button.dataset.copy))));
-  document.querySelectorAll('[data-regenerate]').forEach((button) => button.addEventListener('click', () => regenerate(button.dataset.regenerate)));
-  document.querySelectorAll('[data-edit-message]').forEach((button) => button.addEventListener('click', () => editMessage(button.dataset.editMessage)));
-}
-
-function resizeTextarea(textarea) { textarea.style.height = 'auto'; textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`; }
-function scrollMessages() { const node = document.querySelector('#messages'); if (node) node.scrollTop = node.scrollHeight; }
-function showToast(message) { const toast = document.querySelector('#toast'); if (!toast) return; toast.textContent = message; toast.classList.add('show'); clearTimeout(showToast.timer); showToast.timer = setTimeout(() => toast.classList.remove('show'), 2200); }
+function activeThread() { return state.threads.find((t) => t.id === state.activeId) || state.threads[0]; }
+function timeLabel(timestamp) { return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+function esc(value = '') { return value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function renderMarkdown(raw = '') { const blocks = raw.split(/```/g); return blocks.map((block, i) => { if (i % 2 === 1) { const lines = block.replace(/^\n/, '').split('\n'); const language = lines.shift() || 'code'; const code = lines.join('\n'); return `<div class="code-block"><div class="code-head"><span>${esc(language)}</span><button class="code-copy" data-copy="${encodeURIComponent(code)}">Copy</button></div><pre>${esc(code)}</pre></div>`; } let html = esc(block).replace(/^### (.*)$/gm, '<h3>$1</h3>').replace(/^## (.*)$/gm, '<h3>$1</h3>').replace(/^# (.*)$/gm, '<h3>$1</h3>').replace(/^[-*] (.*)$/gm, '<li>$1</li>').replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>').replace(/^(\d+)\. (.*)$/gm, '<div class="ordered-item"><span>$1.</span> $2</div>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/__(.*?)__/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/`([^`]+)`/g, '<span class="inline-code">$1</span>').replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>'); return html.split(/\n{2,}/).map((p) => p.startsWith('<h3>') || p.startsWith('<ul>') ? p : `<p>${p.replace(/\n/g, '<br>')}</p>`).join(''); }).join(''); }
+function classify(prompt) { const text = prompt.toLowerCase(); if (/launch|marketing|campaign|go-to-market|gtm/.test(text)) return 'launch'; if (/plan|roadmap|organize|notes|project|workflow|strategy/.test(text)) return 'plan'; if (/explain|what is|how does|teach|complex|difference|why/.test(text)) return 'explain'; if (/code|debug|bug|review|javascript|typescript|python|react|function|api/.test(text)) return 'code'; if (/write|draft|email|copy|headline|post|creative/.test(text)) return 'write'; return 'general'; }
+function composeResponse(prompt, thread) { const intent = classify(prompt); const name = prompt.trim().split(/\s+/).slice(0, 7).join(' '); const context = thread.messages.length > 1 ? '\n\nI’m carrying the thread context forward, so we can sharpen this from here.' : ''; const responses = { launch: `## A sharper launch frame\n\nFor **${name}**, I’d optimize for a narrow first signal rather than broad awareness. The goal is to make one audience feel that the product was made specifically for their next decision.${context}\n\n### 1. Choose the wedge\n- Name the highest-intent audience in one sentence.\n- Anchor the promise to a visible before → after.\n- Give the first experience a single success moment.\n\n### 2. Build the signal loop\n1. Publish one point-of-view artifact that makes the problem feel urgent.\n2. Invite 10–15 ideal users into a guided first run.\n3. Capture the exact language they use when the value clicks.\n4. Reuse that language everywhere else.\n\n**Useful constraint:** if the launch needs more than one primary CTA, the story is still too wide.`, plan: `## Turn the idea into motion\n\nHere’s a clean operating shape for **${name}**. It keeps momentum visible without pretending every unknown is already solved.${context}\n\n### Now — create traction\n- Define the outcome in one observable sentence.\n- List the three decisions that unlock the next step.\n- Assign an owner and a finish line to each decision.\n\n### Next — reduce uncertainty\n- Identify the assumption most likely to invalidate the plan.\n- Run the smallest test that can change your mind.\n- Record the signal, not just the activity.\n\n### Later — scale the repeatable\nPackage what works into a ritual, template, or system. A good plan should become lighter every time you use it.`, explain: `## The clear version\n\nThink of **${name}** as a system with three layers:\n\n1. **Input** — what the system can observe or receive.\n2. **Transformation** — the rules, reasoning, or process that changes the input.\n3. **Output** — the decision, artifact, or action that becomes useful.\n\nThe common confusion is treating the transformation as magic. Better inputs narrow ambiguity, a visible process makes the result trustworthy, and a specific output makes the result actionable.\n\nIf you share the exact context, I can turn this into an example, an analogy, or a technical breakdown.`, code: `## Code review lens\n\nI’d review **${name}** in this order:\n\n- **Correctness:** what happens on empty, delayed, duplicated, or malformed input?\n- **Boundaries:** which responsibility belongs elsewhere?\n- **Observability:** how would you know this failed in production?\n- **Clarity:** can the next engineer predict the behavior without simulating every branch?\n\nA small pattern I use for safer async work:\n\n\`\`\`js\nconst result = await runTask(input);\nif (!result.ok) {\n  return { ok: false, reason: result.reason };\n}\nreturn { ok: true, value: result.value };\n\`\`\`\n\nPaste the snippet and I’ll mark up the sharp edges directly.`, write: `## A strong first draft\n\nI can shape **${name}** into something direct, specific, and easy to act on. I’d start with a clear point of view instead of a neutral summary:\n\n> Make the important idea impossible to miss — then give the reader a next move.\n\nFrom there, I’ll tune the voice for the audience, remove filler, and keep one dominant message per paragraph. Send me the rough notes, audience, and desired tone, and I’ll turn them into a finished draft.`, general: `## Let’s make it useful\n\nI’m Oxelara’s reasoning workspace. I can help you move from a loose prompt to a clearer decision, plan, explanation, draft, or implementation direction.\n\nFor the strongest result, give me **the outcome**, **the context**, and **the constraint** that matters. You don’t need to configure a model or bring an API key here — just bring the thought.` }; return responses[intent]; }
+function iconButton(label, icon, cls = '', attrs = '') { return `<button class="icon-ghost ${cls}" aria-label="${label}" title="${label}" ${attrs}>${icon}</button>`; }
+function render() { const thread = activeThread(); const hasMessages = thread?.messages?.length > 0; const profile = loadProfile(); document.querySelector('#app').innerHTML = `<div class="app-shell"><aside class="sidebar ${state.mobileOpen ? 'open' : ''}" aria-label="Conversation navigation"><div class="brand"><div class="brand-mark">${ICONS.spark}</div><div><div class="brand-name">OXELARA</div><div class="brand-tag">Intelligence, refined.</div></div></div><button class="new-thread" data-action="new-thread">${ICONS.plus}<span>New conversation</span></button><div class="side-section"><div class="side-label"><span>Your threads</span><button class="search-btn" data-action="search" aria-label="Search conversations">${ICONS.search}</button></div><div class="thread-list">${state.threads.slice().sort((a,b) => b.updatedAt - a.updatedAt).map(threadRow).join('') || '<div class="empty-threads">Your next line of thinking will live here.</div>'}</div></div><div class="sidebar-footer"><button class="download-app" data-action="download">${ICONS.download}<span>Get the app</span><small>Install on this device</small></button><div class="engine-badge"><i class="engine-dot"></i><span>Oxelara Neural Engine</span></div><div class="engine-meta">PRIVATE BY DEFAULT · ${profile ? esc(profile.name.toUpperCase()) : 'LOCAL SESSION'}</div></div></aside><main class="workspace"><header class="topbar"><div class="mobile-brand"><div class="brand-mark">${ICONS.spark}</div><div class="brand-name">OXELARA</div></div><div class="thread-context"><div class="eyebrow">Active thread</div><h2>${esc(thread?.title || 'Untitled conversation')}</h2></div><div class="top-actions"><button class="top-action mobile-menu" data-action="toggle-menu" aria-label="Open conversations">${ICONS.menu}</button><div class="status-pill"><i class="engine-dot"></i> OXELARA ENGINE · READY</div><button class="top-action auth-button" data-action="auth">${profile ? esc(profile.name) : 'Sign in'}</button><button class="top-action" data-action="new-thread">${ICONS.plus}<span>New thread</span></button><button class="top-action" data-action="thread-menu" aria-label="Thread options">${ICONS.more}</button></div></header><section class="content"><div class="chat-column"><div class="messages" id="messages">${hasMessages ? `<div class="message-list">${thread.messages.map(messageMarkup).join('')}</div>` : emptyMarkup()}</div><div class="composer-wrap"><div class="mode-strip"><span class="mode-label">${state.imageMode ? ICONS.image + ' Image studio' : ICONS.spark + ' Oxelara chat'}</span><button type="button" data-action="toggle-image">${state.imageMode ? 'Back to chat' : 'Create an image'}</button></div><form class="composer" id="composer"><button type="button" class="attach-btn" data-action="attach" aria-label="Attach a file">${ICONS.attach}</button><textarea id="prompt" rows="1" placeholder="${state.imageMode ? 'Describe the image you want to make…' : 'Ask Oxelara anything…'}" aria-label="Message Oxelara"></textarea><div class="composer-actions">${state.generating ? `<button type="button" class="stop-btn" data-action="stop" aria-label="Stop generation">${ICONS.stop}</button>` : `<button class="send-btn" type="submit" aria-label="Send message">${ICONS.arrow}</button>`}</div></form><div class="composer-hint"><span>${state.imageMode ? 'Image studio is ready for a visual brief' : 'Oxelara Engine · Local session · No API key required'}</span><span class="hint-right"><span>Press</span><span class="key-hint">⌘ ↵</span><span>to send</span></span></div></div></div></section></main>${state.modal ? modalMarkup() : ''}<div class="toast" id="toast"></div>${!localStorage.getItem(CONSENT_KEY) ? `<div class="cookie-card"><strong>Private by default.</strong><span>We use essential storage to keep your threads on this device. Read our <button data-action="privacy">privacy note</button>.</span><button class="cookie-ok" data-action="consent">Got it</button></div>` : ''}</div>`; bindEvents(); if (hasMessages) scrollMessages(); }
+function threadRow(thread) { return `<div class="thread-item ${thread.id === state.activeId ? 'active' : ''}" data-thread="${thread.id}"><span class="thread-icon">${ICONS.message}</span><span class="thread-title">${esc(thread.title)}</span><span class="thread-actions">${iconButton('Rename', ICONS.edit, '', `data-rename="${thread.id}"`)}${iconButton('Delete', ICONS.trash, 'danger', `data-delete="${thread.id}"`)}</span></div>`; }
+function emptyMarkup() { return `<div class="empty-state"><div class="empty-kicker">A calmer place to think</div><h1>What are we<br /><em>making happen?</em></h1><p>Bring the half-formed idea, the hard decision, or the messy draft. Oxelara helps you find the useful next move — without making you learn how to prompt.</p><div class="prompt-grid">${starters.map((item, i) => `<button class="prompt-card" data-starter="${i}"><span class="prompt-icon">${item.icon}</span><strong>${item.title}</strong><span>${item.hint}</span></button>`).join('')}</div></div>`; }
+function messageMarkup(message) { const isUser = message.role === 'user'; const content = message.streaming && !message.content ? '<span class="typing"><i></i><i></i><i></i></span>' : (isUser ? esc(message.content).replace(/\n/g, '<br>') : renderMarkdown(message.content)); return `<article class="message ${isUser ? 'user' : 'assistant'} ${message.streaming ? 'is-streaming' : ''}" data-message="${message.id}"><div class="avatar">${isUser ? 'Y' : ICONS.spark}</div><div class="message-body"><div class="message-meta"><span>${isUser ? 'You' : 'Oxelara'}</span><span>${message.streaming ? 'thinking…' : timeLabel(message.createdAt)}</span></div><div class="message-content">${content}</div><div class="message-tools">${!isUser && !message.streaming ? `<button class="tool-btn" data-copy-message="${message.id}">${ICONS.copy} Copy</button><button class="tool-btn" data-regenerate="${message.id}">${ICONS.refresh} Refine</button>` : ''}${isUser ? `<button class="tool-btn" data-edit-message="${message.id}">${ICONS.edit} Edit</button>` : ''}</div></div></article>`; }
+function modalMarkup() { if (state.modal === 'auth') return `<div class="modal-backdrop" data-action="close-modal"><div class="modal-card" onclick="event.stopPropagation()"><button class="modal-close" data-action="close-modal">×</button><div class="modal-kicker">Your thinking, kept yours</div><h2>Save your Oxelara workspace.</h2><p class="modal-copy">Create a lightweight local profile now. Connect a real account backend later without changing the experience.</p><form id="auth-form"><label>Your name<input name="name" required placeholder="How should Oxelara address you?" /></label><label>Email address<input name="email" type="email" required placeholder="you@example.com" /></label><button class="modal-submit">Continue privately</button></form><small>By continuing, you agree to our <button type="button" data-action="terms">Terms</button> and <button type="button" data-action="privacy">Privacy note</button>.</small></div></div>`; const title = state.modal === 'terms' ? 'Terms of use' : 'Privacy note'; const copy = state.modal === 'terms' ? 'Oxelara is provided as a workspace for drafts, decisions, and experiments. Review generated content before relying on it. Do not use it for emergency, legal, medical, or financial decisions without qualified human review.' : 'This static build stores threads and your optional profile in your browser’s local storage. It does not send that information anywhere by itself. A production account system, retention controls, export, and deletion workflow should be connected before public scale.'; return `<div class="modal-backdrop" data-action="close-modal"><div class="modal-card legal-card" onclick="event.stopPropagation"><button class="modal-close" data-action="close-modal">×</button><div class="modal-kicker">Oxelara / ${title}</div><h2>${title}</h2><p>${copy}</p><div class="legal-links"><button data-action="terms">Terms</button><button data-action="privacy">Privacy</button></div></div></div>`; }
+function bindEvents() { document.querySelectorAll('[data-action="new-thread"]').forEach((b) => b.addEventListener('click', newThread)); document.querySelector('[data-action="toggle-menu"]')?.addEventListener('click', () => { state.mobileOpen = !state.mobileOpen; render(); }); document.querySelector('[data-action="search"]')?.addEventListener('click', searchThreads); document.querySelector('[data-action="thread-menu"]')?.addEventListener('click', () => renameThread(state.activeId)); document.querySelector('[data-action="auth"]')?.addEventListener('click', () => { state.modal = 'auth'; render(); }); document.querySelector('[data-action="download"]')?.addEventListener('click', installApp); document.querySelector('[data-action="toggle-image"]')?.addEventListener('click', () => { state.imageMode = !state.imageMode; render(); }); document.querySelector('[data-action="attach"]')?.addEventListener('click', () => showToast('File attachments are next on the engine roadmap.')); document.querySelectorAll('[data-thread]').forEach((row) => row.addEventListener('click', (e) => { if (e.target.closest('[data-rename]') || e.target.closest('[data-delete]')) return; if (state.generating) { showToast('Let the current response finish first.'); return; } state.activeId = row.dataset.thread; state.mobileOpen = false; render(); })); document.querySelectorAll('[data-rename]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); renameThread(b.dataset.rename); })); document.querySelectorAll('[data-delete]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); deleteThread(b.dataset.delete); })); document.querySelectorAll('[data-starter]').forEach((b) => b.addEventListener('click', () => { if (activeThread().messages.length) newThread(); sendPrompt(starters[b.dataset.starter].title); })); document.querySelector('#composer')?.addEventListener('submit', (e) => { e.preventDefault(); sendPrompt(document.querySelector('#prompt').value); }); document.querySelector('#prompt')?.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); sendPrompt(e.target.value); } resizeTextarea(e.target); }); document.querySelector('#prompt')?.addEventListener('input', (e) => resizeTextarea(e.target)); document.querySelector('[data-action="stop"]')?.addEventListener('click', stopGeneration); document.querySelectorAll('[data-copy-message]').forEach((b) => b.addEventListener('click', () => copyMessage(b.dataset.copyMessage))); document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyText(decodeURIComponent(b.dataset.copy)))); document.querySelectorAll('[data-regenerate]').forEach((b) => b.addEventListener('click', () => regenerate(b.dataset.regenerate))); document.querySelectorAll('[data-edit-message]').forEach((b) => b.addEventListener('click', () => editMessage(b.dataset.editMessage))); document.querySelectorAll('[data-action="consent"]').forEach((b) => b.addEventListener('click', () => { localStorage.setItem(CONSENT_KEY, 'accepted'); render(); })); document.querySelectorAll('[data-action="privacy"], [data-action="terms"]').forEach((b) => b.addEventListener('click', () => { state.modal = b.dataset.action; render(); })); document.querySelectorAll('[data-action="close-modal"]').forEach((b) => b.addEventListener('click', () => { state.modal = null; render(); })); document.querySelector('#auth-form')?.addEventListener('submit', (e) => { e.preventDefault(); const data = new FormData(e.target); localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: data.get('name'), email: data.get('email') })); state.modal = null; render(); showToast('Your local profile is ready'); }); }
+function loadProfile() { try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); } catch { return null; } }
+function resizeTextarea(t) { t.style.height = 'auto'; t.style.height = `${Math.min(t.scrollHeight, 160)}px`; }
+function scrollMessages() { const n = document.querySelector('#messages'); if (n) n.scrollTop = n.scrollHeight; }
+function showToast(message) { const t = document.querySelector('#toast'); if (!t) return; t.textContent = message; t.classList.add('show'); clearTimeout(showToast.timer); showToast.timer = setTimeout(() => t.classList.remove('show'), 2200); }
 async function copyText(text) { try { await navigator.clipboard.writeText(text); showToast('Copied to clipboard'); } catch { showToast('Copy unavailable in this browser'); } }
-function copyMessage(id) { const message = activeThread().messages.find((item) => item.id === id); if (message) copyText(message.content); }
-function newThread() { stopGeneration(); const thread = makeThread(); state.threads.unshift(thread); state.activeId = thread.id; state.mobileOpen = false; saveThreads(); render(); setTimeout(() => document.querySelector('#prompt')?.focus(), 50); }
-function renameThread(id) { const thread = state.threads.find((item) => item.id === id); if (!thread) return; const next = window.prompt('Name this conversation', thread.title); if (next?.trim()) { thread.title = next.trim().slice(0, 60); thread.updatedAt = Date.now(); saveThreads(); render(); } }
-function deleteThread(id) { if (state.threads.length === 1) { showToast('Keep one thread ready for your next thought.'); return; } const thread = state.threads.find((item) => item.id === id); if (!thread || !window.confirm(`Delete “${thread.title}”?`)) return; state.threads = state.threads.filter((item) => item.id !== id); if (state.activeId === id) state.activeId = state.threads[0].id; saveThreads(); render(); }
-function searchThreads() { const query = window.prompt('Search your threads'); if (!query?.trim()) return; const match = state.threads.find((thread) => `${thread.title} ${thread.messages.map((m) => m.content).join(' ')}`.toLowerCase().includes(query.toLowerCase())); if (match) { state.activeId = match.id; render(); showToast(`Opened “${match.title}”`); } else showToast('No matching thread found'); }
-
-function sendPrompt(value) {
-  const prompt = value.trim(); if (!prompt || state.generating) return;
-  const thread = activeThread();
-  if (state.editingMessageId) {
-    const editIndex = thread.messages.findIndex((message) => message.id === state.editingMessageId);
-    if (editIndex >= 0) thread.messages.splice(editIndex);
-    state.editingMessageId = null;
-  }
-  if (!thread.messages.length && thread.title === 'Untitled conversation') thread.title = prompt.slice(0, 42) + (prompt.length > 42 ? '…' : '');
-  thread.messages.push({ id: uid(), role: 'user', content: prompt, createdAt: Date.now() });
-  thread.updatedAt = Date.now(); saveThreads(); state.generating = true; render();
-  const assistant = { id: uid(), role: 'assistant', content: '', createdAt: Date.now(), streaming: true };
-  thread.messages.push(assistant); render();
-  let response;
-  try { response = composeResponse(prompt, thread); } catch (error) {
-    response = `I hit a local reasoning error while shaping that response. You can **regenerate** this answer or try a shorter prompt.\n\n_Error: ${error.message || 'unknown engine error'}_`;
-  }
-  let cursor = 0;
-  state.streamTimer = setInterval(() => {
-    cursor = Math.min(response.length, cursor + Math.max(2, Math.round(response.length / 85)));
-    assistant.content = response.slice(0, cursor);
-    if (cursor >= response.length) { clearInterval(state.streamTimer); state.streamTimer = null; assistant.streaming = false; state.generating = false; thread.updatedAt = Date.now(); saveThreads(); }
-    render();
-  }, 26);
-}
-function stopGeneration() { if (!state.generating) return; clearInterval(state.streamTimer); state.streamTimer = null; const thread = activeThread(); const active = thread.messages[thread.messages.length - 1]; if (active?.streaming) { active.streaming = false; active.content += '\n\n_Generation paused. You can regenerate this response when ready._'; } state.generating = false; saveThreads(); render(); showToast('Generation stopped'); }
-function regenerate(messageId) { const thread = activeThread(); const index = thread.messages.findIndex((message) => message.id === messageId); if (index < 1 || state.generating) return; const prompt = thread.messages[index - 1]?.content; thread.messages.splice(index, 1); state.generating = true; const assistant = { id: uid(), role: 'assistant', content: '', createdAt: Date.now(), streaming: true }; thread.messages.splice(index, 0, assistant); render(); const response = composeResponse(prompt, thread) + '\n\n_Refined pass: I’ve tightened the signal and made the next step more concrete._'; let cursor = 0; state.streamTimer = setInterval(() => { cursor = Math.min(response.length, cursor + Math.max(2, Math.round(response.length / 85))); assistant.content = response.slice(0, cursor); if (cursor >= response.length) { clearInterval(state.streamTimer); state.streamTimer = null; assistant.streaming = false; state.generating = false; saveThreads(); } render(); }, 26); }
-function editMessage(messageId) { const message = activeThread().messages.find((item) => item.id === messageId); const prompt = document.querySelector('#prompt'); if (!message || !prompt) return; state.editingMessageId = messageId; prompt.value = message.content; resizeTextarea(prompt); prompt.focus(); showToast('Edit the prompt, then send it again'); }
-
+function copyMessage(id) { const m = activeThread().messages.find((x) => x.id === id); if (m) copyText(m.content); }
+function newThread() { stopGeneration(); const t = makeThread(); state.threads.unshift(t); state.activeId = t.id; state.mobileOpen = false; saveThreads(); render(); setTimeout(() => document.querySelector('#prompt')?.focus(), 50); }
+function renameThread(id) { const t = state.threads.find((x) => x.id === id); if (!t) return; const next = window.prompt('Name this conversation', t.title); if (next?.trim()) { t.title = next.trim().slice(0, 60); t.updatedAt = Date.now(); saveThreads(); render(); } }
+function deleteThread(id) { if (state.threads.length === 1) { showToast('Keep one thread ready for your next thought.'); return; } const t = state.threads.find((x) => x.id === id); if (!t || !window.confirm(`Delete “${t.title}”?`)) return; state.threads = state.threads.filter((x) => x.id !== id); if (state.activeId === id) state.activeId = state.threads[0].id; saveThreads(); render(); }
+function searchThreads() { const q = window.prompt('Search your threads'); if (!q?.trim()) return; const m = state.threads.find((t) => `${t.title} ${t.messages.map((x) => x.content).join(' ')}`.toLowerCase().includes(q.toLowerCase())); if (m) { state.activeId = m.id; render(); showToast(`Opened “${m.title}”`); } else showToast('No matching thread found'); }
+function sendPrompt(value) { const prompt = value.trim(); if (!prompt || state.generating) return; const thread = activeThread(); if (state.editingMessageId) { const i = thread.messages.findIndex((m) => m.id === state.editingMessageId); if (i >= 0) thread.messages.splice(i); state.editingMessageId = null; } if (!thread.messages.length && thread.title === 'Untitled conversation') thread.title = prompt.slice(0, 42) + (prompt.length > 42 ? '…' : ''); thread.messages.push({ id: uid(), role: 'user', content: prompt, createdAt: Date.now() }); thread.updatedAt = Date.now(); saveThreads(); state.generating = true; render(); const assistant = { id: uid(), role: 'assistant', content: '', createdAt: Date.now(), streaming: true }; thread.messages.push(assistant); render(); const response = state.imageMode ? `## Image brief captured\n\nI’ve shaped your visual direction for **${esc(prompt.slice(0, 64))}**.\n\nThe image generation pipeline is the next engine layer to connect here. Your brief, style, aspect ratio, and reference controls now have a dedicated home in Oxelara.` : composeResponse(prompt, thread); let cursor = 0; state.streamTimer = setInterval(() => { cursor = Math.min(response.length, cursor + Math.max(2, Math.round(response.length / 85))); assistant.content = response.slice(0, cursor); if (cursor >= response.length) { clearInterval(state.streamTimer); state.streamTimer = null; assistant.streaming = false; state.generating = false; thread.updatedAt = Date.now(); saveThreads(); } render(); }, 26); }
+function stopGeneration() { if (!state.generating) return; clearInterval(state.streamTimer); state.streamTimer = null; const t = activeThread(); const a = t.messages[t.messages.length - 1]; if (a?.streaming) { a.streaming = false; a.content += '\n\n_Generation paused. You can refine this response when ready._'; } state.generating = false; saveThreads(); render(); showToast('Generation stopped'); }
+function regenerate(id) { const t = activeThread(); const i = t.messages.findIndex((m) => m.id === id); if (i < 1 || state.generating) return; const prompt = t.messages[i - 1]?.content; t.messages.splice(i, 1); state.generating = true; const a = { id: uid(), role: 'assistant', content: '', createdAt: Date.now(), streaming: true }; t.messages.splice(i, 0, a); render(); const response = composeResponse(prompt, t) + '\n\n_Refined pass: I’ve tightened the signal and made the next step more concrete._'; let c = 0; state.streamTimer = setInterval(() => { c = Math.min(response.length, c + Math.max(2, Math.round(response.length / 85))); a.content = response.slice(0, c); if (c >= response.length) { clearInterval(state.streamTimer); state.streamTimer = null; a.streaming = false; state.generating = false; saveThreads(); } render(); }, 26); }
+function editMessage(id) { const m = activeThread().messages.find((x) => x.id === id); const p = document.querySelector('#prompt'); if (!m || !p) return; state.editingMessageId = id; p.value = m.content; resizeTextarea(p); p.focus(); showToast('Edit the prompt, then send it again'); }
+async function installApp() { if (window.deferredPrompt) { window.deferredPrompt.prompt(); await window.deferredPrompt.userChoice; window.deferredPrompt = null; return; } if (window.matchMedia('(display-mode: standalone)').matches) showToast('Oxelara is already installed'); else showToast('Use your browser menu and choose “Install app”'); }
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window.deferredPrompt = e; });
 render();
