@@ -1,6 +1,6 @@
-# Idris AI — delivery outcomes
+# Oxelara AI — delivery outcomes
 
-- [ ] **A responsive Idris AI chat workspace with a premium desktop and mobile experience.** The product must feel like an elite AI workspace, adapt cleanly across desktop and narrow mobile viewports, and use the Idris identity throughout the shell, empty state, thread list, composer, and message view.
+- [ ] **A responsive Oxelara AI chat workspace with a premium desktop and mobile experience.** The product must feel like an elite AI workspace, adapt cleanly across desktop and narrow mobile viewports, and use the Oxelara identity throughout the shell, empty state, thread list, composer, and message view.
 
 - [ ] **A real-time conversational interface with message streaming, loading states, and clear error recovery.** Users must be able to submit prompts, see an in-progress response state, stop generation, and recover from invalid or empty submissions without a broken screen.
 
@@ -12,9 +12,9 @@
 
 - [ ] **Conversation controls including stop generation, regenerate response, and edit-and-resubmit.** The workspace must expose these controls in the message experience and keep them usable during and after generation.
 
-- [ ] **Useful empty state with suggested prompts for quickly starting a conversation.** The initial workspace must explain Idris's capability and offer prompt starters that submit directly into a new thread.
+- [ ] **Useful empty state with suggested prompts for quickly starting a conversation.** The initial workspace must explain Oxelara's capability and offer prompt starters that submit directly into a new thread.
 
-- [ ] **Zero-configuration operation with no manual API keys or end-user setup required.** Idris must work immediately through its built-in Idris Neural Engine architecture; no credentials, provider selection, or onboarding form may block use.
+- [ ] **Zero-configuration operation with no manual API keys or end-user setup required.** Oxelara must work immediately through its built-in Oxelara Neural Engine architecture; no credentials, provider selection, or onboarding form may block use.
 
 - [ ] **Complete repository created and pushed to the user's connected GitHub profile.** The finished source must be committed on main, recorded as a managed checkpoint, and transferred through the connected GitHub workflow.
 

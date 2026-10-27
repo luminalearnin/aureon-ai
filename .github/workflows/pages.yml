@@ -1,4 +1,4 @@
-name: Deploy Idris to GitHub Pages
+name: Deploy Oxelara to GitHub Pages
 
 on:
   push:
