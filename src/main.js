@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'aureon.workspace.v1';
+const STORAGE_KEY = 'idris.workspace.v1';
 const ICONS = {
   spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.4 5.6L5 10l5.6 1.4L12 17l1.4-5.6L19 10l-5.6-1.4L12 3Z"/><path d="m19 16-.7 2.3L16 19l2.3.7L19 22l.7-2.3L22 19l-2.3-.7L19 16Z"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
@@ -92,7 +92,7 @@ function composeResponse(prompt, thread) {
     explain: `## The clear version\n\nThink of **${name}** as a system with three layers:\n\n1. **Input** — what the system can observe or receive.\n2. **Transformation** — the rules, reasoning, or process that changes the input.\n3. **Output** — the decision, artifact, or action that becomes useful.\n\nThe common confusion is treating the transformation as magic. In practice, quality comes from the relationship between the three layers: better inputs narrow ambiguity, a visible process makes the result trustworthy, and a specific output makes the result actionable.\n\nIf you share the exact context, I can turn this into an example, an analogy, or a technical breakdown.`,
     code: `## Code review lens\n\nI’d review **${name}** in this order:\n\n- **Correctness:** what happens on empty, delayed, duplicated, or malformed input?\n- **Boundaries:** which responsibility belongs elsewhere?\n- **Observability:** how would you know this failed in production?\n- **Clarity:** can the next engineer predict the behavior without simulating every branch?\n\nA small pattern I use for safer async work:\n\n\`\`\`js\nconst result = await runTask(input);\nif (!result.ok) {\n  return { ok: false, reason: result.reason };\n}\nreturn { ok: true, value: result.value };\n\`\`\`\n\nPaste the snippet and I’ll mark up the sharp edges directly.`,
     write: `## A strong first draft\n\nI can shape **${name}** into something direct, specific, and easy to act on. I’d start with a clear point of view instead of a neutral summary:\n\n> Make the important idea impossible to miss — then give the reader a next move.\n\nFrom there, I’ll tune the voice for the audience, remove filler, and keep one dominant message per paragraph. Send me the rough notes, audience, and desired tone, and I’ll turn them into a finished draft.`,
-    general: `## Let’s make it useful\n\nI’m Aureon’s built-in reasoning engine. I can help you move from a loose prompt to a clearer decision, plan, explanation, draft, or implementation direction.\n\nFor the strongest result, give me:\n- the outcome you want,\n- the context I should respect, and\n- any constraint that matters.\n\nYou don’t need to configure a model or bring an API key here — just bring the thought.`,
+    general: `## Let’s make it useful\n\nI’m Idris’s built-in reasoning engine. I can help you move from a loose prompt to a clearer decision, plan, explanation, draft, or implementation direction.\n\nFor the strongest result, give me:\n- the outcome you want,\n- the context I should respect, and\n- any constraint that matters.\n\nYou don’t need to configure a model or bring an API key here — just bring the thought.`,
   };
   return responses[intent];
 }
@@ -107,7 +107,7 @@ function render() {
       <aside class="sidebar ${state.mobileOpen ? 'open' : ''}" aria-label="Conversation navigation">
         <div class="brand">
           <div class="brand-mark">${ICONS.spark}</div>
-          <div><div class="brand-name">AUREON</div><div class="brand-tag">Intelligence, refined.</div></div>
+          <div><div class="brand-name">IDRIS</div><div class="brand-tag">Intelligence, refined.</div></div>
         </div>
         <button class="new-thread" data-action="new-thread">${ICONS.plus}<span>New conversation</span></button>
         <div class="side-section">
@@ -116,15 +116,15 @@ function render() {
             ${state.threads.slice().sort((a,b) => b.updatedAt - a.updatedAt).map(threadRow).join('') || '<div class="empty-threads">Your next line of thinking will live here.</div>'}
           </div>
         </div>
-        <div class="sidebar-footer"><div class="engine-badge"><i class="engine-dot"></i><span>Aureon Neural Engine</span></div><div class="engine-meta">LOCAL SESSION · READY</div></div>
+        <div class="sidebar-footer"><div class="engine-badge"><i class="engine-dot"></i><span>Idris Neural Engine</span></div><div class="engine-meta">LOCAL SESSION · READY</div></div>
       </aside>
       <main class="workspace">
         <header class="topbar">
-          <div class="mobile-brand"><div class="brand-mark">${ICONS.spark}</div><div class="brand-name">AUREON</div></div>
+          <div class="mobile-brand"><div class="brand-mark">${ICONS.spark}</div><div class="brand-name">IDRIS</div></div>
           <div class="thread-context"><div class="eyebrow">Active thread</div><h2>${esc(thread?.title || 'Untitled conversation')}</h2></div>
           <div class="top-actions">
             <button class="top-action mobile-menu" data-action="toggle-menu" aria-label="Open conversations">${ICONS.menu}</button>
-            <div class="status-pill"><i class="engine-dot"></i> AUREON ENGINE · READY</div>
+            <div class="status-pill"><i class="engine-dot"></i> IDRIS ENGINE · READY</div>
             <button class="top-action" data-action="new-thread">${ICONS.plus}<span>New thread</span></button>
             <button class="top-action" data-action="thread-menu" aria-label="Thread options">${ICONS.more}</button>
           </div>
@@ -137,10 +137,10 @@ function render() {
             <div class="composer-wrap">
               <form class="composer" id="composer">
                 <button type="button" class="attach-btn" data-action="attach" aria-label="Attach a file" title="Attachments are coming soon">${ICONS.attach}</button>
-                <textarea id="prompt" rows="1" placeholder="Ask Aureon anything…" aria-label="Message Aureon"></textarea>
+                <textarea id="prompt" rows="1" placeholder="Ask Idris anything…" aria-label="Message Idris"></textarea>
                 <div class="composer-actions">${state.generating ? `<button type="button" class="stop-btn" data-action="stop" aria-label="Stop generation">${ICONS.stop}</button>` : `<button class="send-btn" type="submit" aria-label="Send message">${ICONS.arrow}</button>`}</div>
               </form>
-              <div class="composer-hint"><span>Aureon Engine · Local session · No API key required</span><span class="hint-right"><span>Press</span><span class="key-hint">⌘ ↵</span><span>to send</span></span></div>
+              <div class="composer-hint"><span>Idris Engine · Local session · No API key required</span><span class="hint-right"><span>Press</span><span class="key-hint">⌘ ↵</span><span>to send</span></span></div>
             </div>
           </div>
         </section>
@@ -156,13 +156,13 @@ function threadRow(thread) {
 }
 
 function emptyMarkup() {
-  return `<div class="empty-state"><div class="empty-kicker">Private intelligence suite</div><h1>Think <em>beyond</em><br />the prompt.</h1><p>Aureon turns scattered thoughts into clear direction — with an opinion when you need one and room to think when you don’t.</p><div class="prompt-grid">${starters.map((item, index) => `<button class="prompt-card" data-starter="${index}"><span class="prompt-icon">${item.icon}</span><strong>${item.title}</strong><span>${item.hint}</span></button>`).join('')}</div></div>`;
+  return `<div class="empty-state"><div class="empty-kicker">Private intelligence suite</div><h1>Think <em>beyond</em><br />the prompt.</h1><p>Idris turns scattered thoughts into clear direction — with an opinion when you need one and room to think when you don’t.</p><div class="prompt-grid">${starters.map((item, index) => `<button class="prompt-card" data-starter="${index}"><span class="prompt-icon">${item.icon}</span><strong>${item.title}</strong><span>${item.hint}</span></button>`).join('')}</div></div>`;
 }
 
 function messageMarkup(message, index) {
   const isUser = message.role === 'user';
   const content = message.streaming && !message.content ? '<span class="typing"><i></i><i></i><i></i></span>' : (isUser ? esc(message.content).replace(/\n/g, '<br>') : renderMarkdown(message.content));
-  return `<article class="message ${isUser ? 'user' : 'assistant'} ${message.streaming ? 'is-streaming' : ''}" data-message="${message.id}"><div class="avatar">${isUser ? 'Y' : ICONS.spark}</div><div class="message-body"><div class="message-meta"><span>${isUser ? 'You' : 'Aureon'}</span><span>${message.streaming ? 'thinking…' : timeLabel(message.createdAt)}</span></div><div class="message-content">${content}</div><div class="message-tools">${!isUser && !message.streaming ? `<button class="tool-btn" data-copy-message="${message.id}">${ICONS.copy} Copy</button><button class="tool-btn" data-regenerate="${message.id}">${ICONS.refresh} Regenerate</button>` : ''}${isUser ? `<button class="tool-btn" data-edit-message="${message.id}">${ICONS.edit} Edit</button>` : ''}</div></div></article>`;
+  return `<article class="message ${isUser ? 'user' : 'assistant'} ${message.streaming ? 'is-streaming' : ''}" data-message="${message.id}"><div class="avatar">${isUser ? 'Y' : ICONS.spark}</div><div class="message-body"><div class="message-meta"><span>${isUser ? 'You' : 'Idris'}</span><span>${message.streaming ? 'thinking…' : timeLabel(message.createdAt)}</span></div><div class="message-content">${content}</div><div class="message-tools">${!isUser && !message.streaming ? `<button class="tool-btn" data-copy-message="${message.id}">${ICONS.copy} Copy</button><button class="tool-btn" data-regenerate="${message.id}">${ICONS.refresh} Regenerate</button>` : ''}${isUser ? `<button class="tool-btn" data-edit-message="${message.id}">${ICONS.edit} Edit</button>` : ''}</div></div></article>`;
 }
 
 function bindEvents() {
@@ -185,7 +185,7 @@ function bindEvents() {
   document.querySelector('#prompt')?.addEventListener('keydown', (event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); sendPrompt(event.target.value); } resizeTextarea(event.target); });
   document.querySelector('#prompt')?.addEventListener('input', (event) => resizeTextarea(event.target));
   document.querySelector('[data-action="stop"]')?.addEventListener('click', stopGeneration);
-  document.querySelector('[data-action="attach"]')?.addEventListener('click', () => showToast('Attachments will be available in a future Aureon release.'));
+  document.querySelector('[data-action="attach"]')?.addEventListener('click', () => showToast('Attachments will be available in a future Idris release.'));
   document.querySelectorAll('[data-copy-message]').forEach((button) => button.addEventListener('click', () => copyMessage(button.dataset.copyMessage)));
   document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', () => copyText(decodeURIComponent(button.dataset.copy))));
   document.querySelectorAll('[data-regenerate]').forEach((button) => button.addEventListener('click', () => regenerate(button.dataset.regenerate)));
